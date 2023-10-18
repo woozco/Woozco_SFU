@@ -14964,7 +14964,8 @@ const socket = io("/mediasoup")
 
 socket.on('connection-success', ({ socketId }) => {
   console.log(socketId)
-  getLocalStream()
+  // getLocalStream()
+ // getScreenShareStream()
 })
 
 let device
@@ -14974,7 +14975,6 @@ let consumerTransports = []
 let producer
 let consumer
 let isProducer = false
-
 // https://mediasoup.org/documentation/v3/mediasoup-client/api/#ProducerOptions
 // https://mediasoup.org/documentation/v3/mediasoup-client/api/#transport-produce
 let params = {
@@ -15002,17 +15002,6 @@ let params = {
   }
 }
 
-const streamSuccess = (stream) => {
-  localVideo.srcObject = stream
-  const track = stream.getVideoTracks()[0]
-  params = {
-    track,
-    ...params
-  }
-
-  joinRoom()
-}
-
 const joinRoom = () => {
   socket.emit('joinRoom', { roomName }, (data) => {
     console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`)
@@ -15025,9 +15014,21 @@ const joinRoom = () => {
   })
 }
 
+const streamSuccess = (stream, videoElement) => {
+  videoElement.srcObject = stream;  // 화면 공유 비디오 엘리먼트 또는 로컬 비디오 엘리먼트로 스트림 설정
+  const track = stream.getVideoTracks()[0];
+  params = {
+    track,
+    ...params
+  };
+
+  joinRoom();
+}
+
 const getLocalStream = () => {
+  const localVideo = document.getElementById('localVideo'); // 로컬 비디오 엘리먼트 추가
   navigator.mediaDevices.getUserMedia({
-    audio: false,
+    audio: true,
     video: {
       width: {
         min: 640,
@@ -15039,11 +15040,27 @@ const getLocalStream = () => {
       }
     }
   })
-    .then(streamSuccess)
+    .then(stream => streamSuccess(stream, localVideo))  // 로컬 비디오 엘리먼트 전달
     .catch(error => {
-      console.log(error.message)
+      console.log(error.message);
     })
 }
+
+const getScreenShareStream = () => {
+  const shareVideoElement = document.getElementById('shareVideo'); // 화면 공유 비디오 엘리먼트
+  navigator.mediaDevices.getDisplayMedia({
+    video: true
+  })
+    .then(stream => streamSuccess(stream, shareVideoElement))  // 화면 공유 비디오 엘리먼트 전달
+    .catch(error => {
+      console.error('화면 공유 에러:', error);
+    });
+}
+
+document.getElementById('startShare').addEventListener('click', function() {
+  // 사용자가 버튼을 클릭하면 화면 공유 스트림을 가져오도록 변경
+  getScreenShareStream();
+});
 
 // A device is an endpoint connecting to a Router on the 
 // server side to send/recive media
