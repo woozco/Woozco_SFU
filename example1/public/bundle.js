@@ -14964,7 +14964,7 @@ const socket = io("/mediasoup")
 
 socket.on('connection-success', ({ socketId }) => {
   console.log(socketId)
-  // getLocalStream()
+  //getLocalStream()
  // getScreenShareStream()
 })
 
@@ -15059,9 +15059,19 @@ const getScreenShareStream = () => {
 
 document.getElementById('startShare').addEventListener('click', function() {
   // 사용자가 버튼을 클릭하면 화면 공유 스트림을 가져오도록 변경
+  console.log("startShare clicked")
   getScreenShareStream();
 });
 
+document.getElementById('startFace').addEventListener('click',function(){
+  console.log("startFace clicked")
+  getLocalStream();
+})
+
+document.getElementById('nothing').addEventListener('click',function(){
+  console.log("nothing clicked")
+  joinRoom();
+})
 // A device is an endpoint connecting to a Router on the 
 // server side to send/recive media
 const createDevice = async () => {
