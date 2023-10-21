@@ -1,4 +1,8 @@
 # mediasoup3
+Turn 서버 떠있고, 다른 네트워크 사람이랑 테스트까지 완료함
+즉 turn/stun에 대해서 연결 테스트까지는 완료
+근데 보이스는 안됨
+
 mediasoup - Youtube Video Tutorial Series (Part 4)
 YouTube mediasoup tutorial
 
