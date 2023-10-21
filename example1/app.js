@@ -450,27 +450,28 @@ const createWebRtcTransport = async (router) => {
         try {
             // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
             const webRtcTransport_options = {
-                listenIps: [
-                    {
-                        ip: "127.0.0.1", // replace with relevant IP address
-                        announcedIp: null, //
-                    },
-                ],
-                enableUdp: true,
-                enableTcp: true,
-                preferUdp: true,
-                initialAvailableOutgoingBitrate: 1000000, // e.g., 1mbps
-                iceServers: [
-                    {
-                        urls: ["stun:stun.l.google.com:19302"],
-                    },
-                    {
-                        urls: ["turn:aolda-dev.net"],
-                        username: "woozco",
-                        credential: "woozco",
-                    },
-                ],
-            };
+              listenIps: [
+                {
+                  ip: '172.31.1.40', // replace with relevant IP address
+                  announcedIp: '3.39.252.90', // 여기에 대해서 해당 컴퓨팅 환경에 대해
+                }
+              ],
+              enableUdp: true,
+              enableTcp: true,
+              preferUdp: true,
+              initialAvailableOutgoingBitrate: 1000000, // e.g., 1mbps
+                      iceServers: [
+                          {
+                              urls: ["stun:stun.l.google.com:19302"],
+                          },
+                          {
+                              urls: ["turn:aolda-dev.net"],
+                              username: "woozco",
+                              credential: "woozco",
+                          },
+                      ],
+            }
+      
 
             // https://mediasoup.org/documentation/v3/mediasoup/api/#router-createWebRtcTransport
             let transport = await router.createWebRtcTransport(
