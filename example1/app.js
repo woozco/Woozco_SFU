@@ -1,19 +1,20 @@
-/**
- * integrating mediasoup server with a node.js application
- */
-
-/* Please follow mediasoup installation requirements */
-/* https://mediasoup.org/documentation/v3/mediasoup/installation/ */
 import express from "express";
+import cors from "cors";
 const app = express();
+import { createServer } from "https";
+import { Server } from "socket.io";
 
 import https from "httpolyglot";
 import fs from "fs";
 import path from "path";
 const __dirname = path.resolve();
 
-import { Server } from "socket.io";
 import mediasoup from "mediasoup";
+
+app.use(cors({
+    origin: '*',
+    methods: ["GET", "POST"],
+}));
 
 app.get("*", (req, res, next) => {
     const path = "/sfu/";
@@ -35,23 +36,21 @@ const options = {
 };
 
 const httpsServer = https.createServer(options, app);
-httpsServer.listen(3000, () => {
-    console.log("listening on port: " + 3000);
+httpsServer.listen(3002, () => {
+    console.log("listening on port: " + 3002);
 });
 
-const io = new Server(httpsServer);
+const server = createServer();
+const io = new Server(server, {
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"],
+    },
+});
 
 // socket.io namespace (could represent a room?)
 const connections = io.of("/mediasoup");
 
-/**
- * Worker
- * |-> Router(s)
- *     |-> Producer Transport(s)
- *         |-> Producer
- *     |-> Consumer Transport(s)
- *         |-> Consumer
- **/
 let worker;
 let rooms = {}; // { roomName1: { Router, rooms: [ sicketId1, ... ] }, ...}
 let peers = {}; // { socketId1: { roomName1, socket, transports = [id1, id2,] }, producers = [id1, id2,] }, consumers = [id1, id2,], peerDetails }, ...}
@@ -78,10 +77,6 @@ const createWorker = async () => {
 // We create a Worker as soon as our application starts
 worker = createWorker();
 
-// This is an Array of RtpCapabilities
-// https://mediasoup.org/documentation/v3/mediasoup/rtp-parameters-and-capabilities/#RtpCodecCapability
-// list of media codecs supported by mediasoup ...
-// https://github.com/versatica/mediasoup/blob/v3/src/supportedRtpCapabilities.ts
 const mediaCodecs = [
     {
         kind: "audio",
@@ -117,7 +112,6 @@ connections.on("connection", async (socket) => {
     };
 
     socket.on("disconnect", () => {
-        // do some cleanup
         console.log("peer disconnected");
         consumers = removeItems(consumers, socket.id, "consumer");
         producers = removeItems(producers, socket.id, "producer");
@@ -126,7 +120,6 @@ connections.on("connection", async (socket) => {
         const { roomName } = peers[socket.id];
         delete peers[socket.id];
 
-        // remove socket from room
         rooms[roomName] = {
             router: rooms[roomName].router,
             peers: rooms[roomName].peers.filter(
@@ -136,13 +129,11 @@ connections.on("connection", async (socket) => {
     });
 
     socket.on("joinRoom", async ({ roomName }, callback) => {
-        // create Router if it does not exist
-        // const router1 = rooms[roomName] && rooms[roomName].get('data').router || await createRoom(roomName, socket.id)
         const router1 = await createRoom(roomName, socket.id);
 
         peers[socket.id] = {
             socket,
-            roomName, // Name for the Router this Peer joined
+            roomName,
             transports: [],
             producers: [],
             consumers: [],
@@ -160,11 +151,6 @@ connections.on("connection", async (socket) => {
     });
 
     const createRoom = async (roomName, socketId) => {
-        // worker.createRouter(options)
-        // options = { mediaCodecs, appData }
-        // mediaCodecs -> defined above
-        // appData -> custom application data - we are not supplying any
-        // none of the two are required
         let router1;
         let peers = [];
         if (rooms[roomName]) {
@@ -184,28 +170,6 @@ connections.on("connection", async (socket) => {
         return router1;
     };
 
-    // socket.on('createRoom', async (callback) => {
-    //   if (router === undefined) {
-    //     // worker.createRouter(options)
-    //     // options = { mediaCodecs, appData }
-    //     // mediaCodecs -> defined above
-    //     // appData -> custom application data - we are not supplying any
-    //     // none of the two are required
-    //     router = await worker.createRouter({ mediaCodecs, })
-    //     console.log(`Router ID: ${router.id}`)
-    //   }
-
-    //   getRtpCapabilities(callback)
-    // })
-
-    // const getRtpCapabilities = (callback) => {
-    //   const rtpCapabilities = router.rtpCapabilities
-
-    //   callback({ rtpCapabilities })
-    // }
-
-    // Client emits a request to create server side Transport
-    // We need to differentiate between the producer and consumer transports
     socket.on("createWebRtcTransport", async ({ consumer }, callback) => {
         // get Room Name from Peer's properties
         const roomName = peers[socket.id].roomName;
@@ -255,10 +219,8 @@ connections.on("connection", async (socket) => {
     };
 
     const addConsumer = (consumer, roomName) => {
-        // add the consumer to the consumers list
         consumers = [...consumers, { socketId: socket.id, consumer, roomName }];
 
-        // add the consumer id to the peers list
         peers[socket.id] = {
             ...peers[socket.id],
             consumers: [...peers[socket.id].consumers, consumer.id],
@@ -266,7 +228,6 @@ connections.on("connection", async (socket) => {
     };
 
     socket.on("getProducers", (callback) => {
-        //return all producer transports
         const { roomName } = peers[socket.id];
 
         let producerList = [];
@@ -285,8 +246,6 @@ connections.on("connection", async (socket) => {
 
     const informConsumers = (roomName, socketId, id) => {
         console.log(`just joined, id ${id} ${roomName}, ${socketId}`);
-        // A new producer just joined
-        // let all consumers to consume this producer
         producers.forEach((producerData) => {
             if (
                 producerData.socketId !== socketId &&
@@ -448,32 +407,30 @@ connections.on("connection", async (socket) => {
 const createWebRtcTransport = async (router) => {
     return new Promise(async (resolve, reject) => {
         try {
-            // https://mediasoup.org/documentation/v3/mediasoup/api/#WebRtcTransportOptions
             const webRtcTransport_options = {
-              listenIps: [
-                {
-                  ip: '172.31.1.40', // replace with relevant IP address
-                  announcedIp: '3.39.252.90', // 여기에 대해서 해당 컴퓨팅 환경에 대해
-                }
-              ],
-              enableUdp: true,
-              enableTcp: true,
-              preferUdp: true,
-              initialAvailableOutgoingBitrate: 1000000, // e.g., 1mbps
-                      iceServers: [
-                          {
-                              urls: ["stun:stun.l.google.com:19302"],
-                          },
-                          {
-                              urls: ["turn:aolda-dev.net"],
-                              username: "woozco",
-                              credential: "woozco",
-                          },
-                      ],
+                listenIps: [
+                    {
+                        ip: '172.31.1.40', // replace with relevant IP address
+                        announcedIp: '3.39.252.90', // 여기에 대해서 해당 컴퓨팅 환경에 대해
+                    }
+                ],
+                enableUdp: true,
+                enableTcp: true,
+                preferUdp: true,
+                initialAvailableOutgoingBitrate: 1000000, // e.g., 1mbps
+                iceServers: [
+                    {
+                        urls: ["stun:stun.l.google.com:19302"],
+                    },
+                    {
+                        urls: ["turn:aolda-dev.net"],
+                        username: "woozco",
+                        credential: "woozco",
+                    },
+                ],
             }
-      
 
-            // https://mediasoup.org/documentation/v3/mediasoup/api/#router-createWebRtcTransport
+
             let transport = await router.createWebRtcTransport(
                 webRtcTransport_options
             );
