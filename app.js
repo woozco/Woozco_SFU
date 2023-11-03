@@ -1,54 +1,25 @@
-import express from "express";
-import cors from "cors";
-const app = express();
-import { createServer } from "https";
 import { Server } from "socket.io";
-
-import https from "httpolyglot";
-import fs from "fs";
-import path from "path";
-const __dirname = path.resolve();
-
 import mediasoup from "mediasoup";
+import https from "https";
+import fs from "fs";
 
-app.use(cors({
-    origin: '*',
-    methods: ["GET", "POST"],
-}));
-
-app.get("*", (req, res, next) => {
-    const path = "/sfu/";
-
-    if (req.path.indexOf(path) == 0 && req.path.length > path.length)
-        return next();
-
-    res.send(
-        `You need to specify a room name in the path e.g. 'https://127.0.0.1/sfu/room'`
-    );
-});
-
-app.use("/sfu/:room", express.static(path.join(__dirname, "public")));
-
-// SSL cert for HTTPS access
 const options = {
     key: fs.readFileSync("./server/ssl/key.pem", "utf-8"),
     cert: fs.readFileSync("./server/ssl/cert.pem", "utf-8"),
+    cors : {
+        origin: "*",
+        methods: "*",
+    }
 };
 
-const httpsServer = https.createServer(options, app);
+const httpsServer = https.createServer(options);
+
 httpsServer.listen(3002, () => {
     console.log("listening on port: " + 3002);
 });
 
-const server = createServer();
-const io = new Server(server, {
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"],
-    },
-});
+const io = new Server(httpsServer, options);
 
-// socket.io namespace (could represent a room?)
 const connections = io.of("/mediasoup");
 
 let worker;
@@ -95,7 +66,7 @@ const mediaCodecs = [
 ];
 
 connections.on("connection", async (socket) => {
-    console.log(socket.id);
+    console.log("connect : " + socket.id);
     socket.emit("connection-success", {
         socketId: socket.id,
     });
@@ -129,6 +100,7 @@ connections.on("connection", async (socket) => {
     });
 
     socket.on("joinRoom", async ({ roomName }, callback) => {
+        console.log(roomName);
         const router1 = await createRoom(roomName, socket.id);
 
         peers[socket.id] = {
@@ -143,10 +115,7 @@ connections.on("connection", async (socket) => {
             },
         };
 
-        // get Router RTP Capabilities
         const rtpCapabilities = router1.rtpCapabilities;
-
-        // call callback from the client and send back the rtpCapabilities
         callback({ rtpCapabilities });
     });
 
@@ -277,13 +246,11 @@ connections.on("connection", async (socket) => {
     socket.on(
         "transport-produce",
         async ({ kind, rtpParameters, appData }, callback) => {
-            // call produce based on the prameters from the client
             const producer = await getTransport(socket.id).produce({
                 kind,
                 rtpParameters,
             });
 
-            // add producer to the producers array
             const { roomName } = peers[socket.id];
 
             addProducer(producer, roomName);
@@ -297,7 +264,6 @@ connections.on("connection", async (socket) => {
                 producer.close();
             });
 
-            // Send back to the client the Producer's id
             callback({
                 id: producer.id,
                 producersExist: producers.length > 1 ? true : false,
@@ -305,7 +271,6 @@ connections.on("connection", async (socket) => {
         }
     );
 
-    // see client's socket.emit('transport-recv-connect', ...)
     socket.on(
         "transport-recv-connect",
         async ({ dtlsParameters, serverConsumerTransportId }) => {
@@ -333,15 +298,12 @@ connections.on("connection", async (socket) => {
                         transportData.consumer &&
                         transportData.transport.id == serverConsumerTransportId
                 ).transport;
-
-                // check if the router can consume the specified producer
                 if (
                     router.canConsume({
                         producerId: remoteProducerId,
                         rtpCapabilities,
                     })
                 ) {
-                    // transport can now consume and return a consumer
                     const consumer = await consumerTransport.consume({
                         producerId: remoteProducerId,
                         rtpCapabilities,
@@ -371,8 +333,6 @@ connections.on("connection", async (socket) => {
 
                     addConsumer(consumer, roomName);
 
-                    // from the consumer extract the following params
-                    // to send back to the Client
                     const params = {
                         id: consumer.id,
                         producerId: remoteProducerId,
@@ -381,7 +341,6 @@ connections.on("connection", async (socket) => {
                         serverConsumerId: consumer.id,
                     };
 
-                    // send the parameters to the client
                     callback({ params });
                 }
             } catch (error) {
@@ -410,8 +369,8 @@ const createWebRtcTransport = async (router) => {
             const webRtcTransport_options = {
                 listenIps: [
                     {
-                        ip: '172.31.1.40', // replace with relevant IP address
-                        announcedIp: '3.39.252.90', // 여기에 대해서 해당 컴퓨팅 환경에 대해
+                        ip: '0.0.0.0', // replace with relevant IP address
+                        announcedIp: '0.0.0.0', // 여기에 대해서 해당 컴퓨팅 환경에 대해
                     }
                 ],
                 enableUdp: true,
@@ -429,7 +388,6 @@ const createWebRtcTransport = async (router) => {
                     },
                 ],
             }
-
 
             let transport = await router.createWebRtcTransport(
                 webRtcTransport_options
