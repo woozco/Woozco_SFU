@@ -6,7 +6,7 @@ import fs from "fs";
 const options = {
     key: fs.readFileSync("./server/ssl/key.pem", "utf-8"),
     cert: fs.readFileSync("./server/ssl/cert.pem", "utf-8"),
-    cors : {
+    cors: {
         origin: "*",
         methods: "*",
     }
@@ -83,24 +83,26 @@ connections.on("connection", async (socket) => {
     };
 
     socket.on("disconnect", () => {
-        console.log("peer disconnected");
+        console.log("disconnected : " + socket.id);
         consumers = removeItems(consumers, socket.id, "consumer");
         producers = removeItems(producers, socket.id, "producer");
         transports = removeItems(transports, socket.id, "transport");
 
-        const { roomName } = peers[socket.id];
-        delete peers[socket.id];
+        if (peers[socket.id]) {
+            const { roomName } = peers[socket.id];
+            delete peers[socket.id];
 
-        rooms[roomName] = {
-            router: rooms[roomName].router,
-            peers: rooms[roomName].peers.filter(
-                (socketId) => socketId !== socket.id
-            ),
-        };
+            rooms[roomName] = {
+                router: rooms[roomName].router,
+                peers: rooms[roomName].peers.filter(
+                    (socketId) => socketId !== socket.id
+                ),
+            };
+        }
     });
 
-    socket.on("joinRoom", async ({ roomName }, callback) => {
-        console.log(roomName);
+    socket.on("joinRoom", async (roomName, callback) => {
+        console.log("joinRoom : " + roomName);
         const router1 = await createRoom(roomName, socket.id);
 
         peers[socket.id] = {
@@ -139,29 +141,23 @@ connections.on("connection", async (socket) => {
         return router1;
     };
 
-    socket.on("createWebRtcTransport", async ({ consumer }, callback) => {
-        // get Room Name from Peer's properties
+    socket.on("createWebRtcTransport", async (consumer, callback) => {
         const roomName = peers[socket.id].roomName;
-
-        // get Router (Room) object this peer is in based on RoomName
         const router = rooms[roomName].router;
-
+        console.log("createWebRtcTransport : " + roomName, router);
         createWebRtcTransport(router).then(
             (transport) => {
                 callback({
-                    params: {
-                        id: transport.id,
-                        iceParameters: transport.iceParameters,
-                        iceCandidates: transport.iceCandidates,
-                        dtlsParameters: transport.dtlsParameters,
-                    },
+                    id: transport.id,
+                    iceParameters: transport.iceParameters,
+                    iceCandidates: transport.iceCandidates,
+                    dtlsParameters: transport.dtlsParameters,
                 });
-
-                // add transport to Peer's properties
+                console.log("createWebRtcTransport : " + transport);
                 addTransport(transport, roomName, consumer);
             },
             (error) => {
-                console.log(error);
+                console.log("createWebRtcTransport : " + error);
             }
         );
     });
@@ -201,10 +197,7 @@ connections.on("connection", async (socket) => {
 
         let producerList = [];
         producers.forEach((producerData) => {
-            if (
-                producerData.socketId !== socket.id &&
-                producerData.roomName === roomName
-            ) {
+            if (producerData.socketId !== socket.id && producerData.roomName === roomName) {
                 producerList = [...producerList, producerData.producer.id];
             }
         });
@@ -229,23 +222,20 @@ connections.on("connection", async (socket) => {
 
     const getTransport = (socketId) => {
         const [producerTransport] = transports.filter(
-            (transport) =>
-                transport.socketId === socketId && !transport.consumer
+            (transport) => {
+                return transport.socketId == socketId && !transport.consumer.consumer
+            }
         );
         return producerTransport.transport;
     };
 
-    // see client's socket.emit('transport-connect', ...)
-    socket.on("transport-connect", ({ dtlsParameters }) => {
+    socket.on("transport-connect", dtlsParameters => {
         console.log("DTLS PARAMS... ", { dtlsParameters });
-
-        getTransport(socket.id).connect({ dtlsParameters });
+        getTransport(socket.id).connect(dtlsParameters);
     });
 
     // see client's socket.emit('transport-produce', ...)
-    socket.on(
-        "transport-produce",
-        async ({ kind, rtpParameters, appData }, callback) => {
+    socket.on("transport-produce", async ({ kind, rtpParameters, appData }, callback) => {
             const producer = await getTransport(socket.id).produce({
                 kind,
                 rtpParameters,
@@ -266,7 +256,7 @@ connections.on("connection", async (socket) => {
 
             callback({
                 id: producer.id,
-                producersExist: producers.length > 1 ? true : false,
+                producersExist: producers.length > 0 ? true : false,
             });
         }
     );
@@ -280,7 +270,7 @@ connections.on("connection", async (socket) => {
                     transportData.consumer &&
                     transportData.transport.id == serverConsumerTransportId
             ).transport;
-            await consumerTransport.connect({ dtlsParameters });
+            await consumerTransport.connect( dtlsParameters );
         }
     );
 
@@ -369,8 +359,8 @@ const createWebRtcTransport = async (router) => {
             const webRtcTransport_options = {
                 listenIps: [
                     {
-                        ip: '0.0.0.0', // replace with relevant IP address
-                        announcedIp: '0.0.0.0', // 여기에 대해서 해당 컴퓨팅 환경에 대해
+                        ip: '172.18.0.201', // replace with relevant IP address
+                        announcedIp: '10.16.16.50', // 여기에 대해서 해당 컴퓨팅 환경에 대해
                     }
                 ],
                 enableUdp: true,
@@ -389,6 +379,7 @@ const createWebRtcTransport = async (router) => {
                 ],
             }
 
+            console.log("createWebRtcTransport : ", router);
             let transport = await router.createWebRtcTransport(
                 webRtcTransport_options
             );
