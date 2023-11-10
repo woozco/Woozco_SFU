@@ -144,7 +144,7 @@ connections.on("connection", async (socket) => {
     socket.on("createWebRtcTransport", async (consumer, callback) => {
         const roomName = peers[socket.id].roomName;
         const router = rooms[roomName].router;
-        console.log("createWebRtcTransport : " + roomName, router);
+
         createWebRtcTransport(router).then(
             (transport) => {
                 callback({
@@ -153,8 +153,7 @@ connections.on("connection", async (socket) => {
                     iceCandidates: transport.iceCandidates,
                     dtlsParameters: transport.dtlsParameters,
                 });
-                console.log("createWebRtcTransport : " + transport);
-                addTransport(transport, roomName, consumer);
+                addTransport(transport, roomName, consumer.consumer);
             },
             (error) => {
                 console.log("createWebRtcTransport : " + error);
@@ -167,7 +166,6 @@ connections.on("connection", async (socket) => {
             ...transports,
             { socketId: socket.id, transport, roomName, consumer },
         ];
-
         peers[socket.id] = {
             ...peers[socket.id],
             transports: [...peers[socket.id].transports, transport.id],
@@ -230,7 +228,7 @@ connections.on("connection", async (socket) => {
     };
 
     socket.on("transport-connect", dtlsParameters => {
-        console.log("DTLS PARAMS... ", { dtlsParameters });
+        console.log("DTLS PARAMS... ", dtlsParameters);
         getTransport(socket.id).connect(dtlsParameters);
     });
 
@@ -331,7 +329,7 @@ connections.on("connection", async (socket) => {
                         serverConsumerId: consumer.id,
                     };
 
-                    callback({ params });
+                    callback( params );
                 }
             } catch (error) {
                 console.log(error.message);
@@ -344,11 +342,11 @@ connections.on("connection", async (socket) => {
         }
     );
 
-    socket.on("consumer-resume", async ({ serverConsumerId }) => {
-        console.log("consumer resume");
+    socket.on("consumer-resume", async ( serverConsumerId ) => {
         const { consumer } = consumers.find(
-            (consumerData) => consumerData.consumer.id === serverConsumerId
+            (consumerData) => consumerData.consumer.id === serverConsumerId.serverConsumerId
         );
+        console.log("cs > ", JSON.stringify(consumers));
         await consumer.resume();
     });
 });
