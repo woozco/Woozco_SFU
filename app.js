@@ -123,16 +123,18 @@ connections.on("connection", async (socket) => {
         producers = removeItems(producers, socket.id, "producer");
         transports = removeItems(transports, socket.id, "transport");
 
-        const { roomName } = peers[socket.id];
-        delete peers[socket.id];
-
-        // remove socket from room
-        rooms[roomName] = {
-            router: rooms[roomName].router,
-            peers: rooms[roomName].peers.filter(
-                (socketId) => socketId !== socket.id
-            ),
-        };
+        if(peers[socket.id]) {
+            const { roomName } = peers[socket.id];
+            delete peers[socket.id];
+    
+            // remove socket from room
+            rooms[roomName] = {
+                router: rooms[roomName].router,
+                peers: rooms[roomName].peers.filter(
+                    (socketId) => socketId !== socket.id
+                ),
+            };
+        }
     });
 
     socket.on("joinRoom", async ({ roomName }, callback) => {
@@ -452,15 +454,18 @@ const createWebRtcTransport = async (router) => {
             const webRtcTransport_options = {
               listenIps: [
                 {
-                  ip: '172.31.1.40', // replace with relevant IP address
-                  announcedIp: '3.39.252.90', // 여기에 대해서 해당 컴퓨팅 환경에 대해
+                  ip: '', // private ip
+                  announcedIp: '', // public ip
                 }
               ],
               enableUdp: true,
               enableTcp: true,
               preferUdp: true,
               initialAvailableOutgoingBitrate: 1000000, // e.g., 1mbps
-                      iceServers: [
+              minimumAvailadbleOutgoingBitrate : 600000, 
+              maxIncomingBitrate : 1500000,
+              maxSctpMessageSize : 262144,
+              iceServers: [
                           {
                               urls: ["stun:stun.l.google.com:19302"],
                           },

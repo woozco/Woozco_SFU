@@ -1,24 +1,30 @@
 <html>
-  <head>
+
+<head>
     <style>
         button {
             margin: 2;
         }
+
         tr {
             vertical-align: top;
         }
+
         video {
             width: 360px;
             background-color: black;
             padding: 10;
             margin: 1px 1px;
         }
+
         .mainTable {
             width: 100%;
         }
+
         .localColumn {
             width: 246px;
         }
+
         .remoteColumn {
             display: flex;
             flex-wrap: wrap;
@@ -27,6 +33,7 @@
         #localVideo {
             width: 240;
         }
+
         .remoteVideo {
             float: left;
         }
@@ -51,18 +58,21 @@
             }
         }
     </style>
-  </head>
-  <body>
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+</head>
+
+<body>
+
     <body>
         <div id="video">
             <table class="mainTable">
                 <tbody>
                     <tr>
                         <td class="localColumn">
-                            <video id="localVideo" autoplay class="video" muted ></video>
+                            <video id="localVideo" autoplay class="video"></video>
                         </td>
                         <td class="localColumn">
-                            <video id="shareVideo" autoplay class="video" muted ></video>
+                            <video id="shareVideo" autoplay class="video"></video>
                         </td>
                         <td class="remoteColumn">
                             <div id="videoContainer"></div>
@@ -74,7 +84,7 @@
                 <tbody>
                     <tr>
                         <td>
-                            
+
                         </td>
                     </tr>
                 </tbody>
@@ -84,8 +94,17 @@
     <button id="startShare">화면 공유 시작</button>
     <button id="startFace">얼굴 공유 시작</button>
     <button id="nothing">싫어</button>
-  </body>
-  <footer>
-      <script src="bundle.js"></script>
-  </footer>
+</body>
+<div id="chatList">
+</div>
+<div className="chat-input">
+    <input id="msg" type="text" placeholder="메시지 입력" />
+    <button id="sendMsg">전송</button>
+</div>
+<div id="clientList">
+</div>
+<footer>
+    <script src="bundle.js"></script>
+</footer>
+
 </html>
