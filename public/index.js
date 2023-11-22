@@ -5,10 +5,13 @@ const roomName = window.location.pathname.split("/")[2];
 require('dotenv').config();
 
 const socket = io("/mediasoup");
-const chat = io("");
+const chat = io("http://woozco.aolda.net");
 
 let messages = [];
 let clients = [];
+let isCam = false;
+let isShare = false;
+let isMic = false;
 
 socket.on("connection-success", ({ socketId }) => {
   console.log(socketId);
@@ -51,6 +54,7 @@ const joinRoom = () => {
     console.log(`Router RTP Capabilities... ${data.rtpCapabilities}`);
     // we assign to local variable and will be used when
     // loading the client Device (see createDevice above)
+
     rtpCapabilities = data.rtpCapabilities;
 
     // once we have rtpCapabilities from the Router, create Device
@@ -58,9 +62,8 @@ const joinRoom = () => {
   });
 };
 
-const streamSuccess = (stream, videoElement) => {
-
-  videoElement.srcObject = stream; // 화면 공유 비디오 엘리먼트 또는 로컬 비디오 엘리먼트로 스트림 설정
+const streamSuccess = (stream, element) => {
+  element.srcObject = stream;
   const track = stream.getVideoTracks()[0];
   params = {
     track,
@@ -70,12 +73,22 @@ const streamSuccess = (stream, videoElement) => {
   joinRoom();
 };
 
+const audioStreamSuccess = (stream, element) => {
+  element.srcObject = stream;
+  const track = stream.getAudioTracks()[0];
+  params = {
+    track,
+    ...params,
+  };
+
+  joinRoom();
+};
+
 const getLocalStream = () => {
-  const localVideo = document.getElementById("localVideo"); // 로컬 비디오 엘리먼트 추가
+  const localVideo = document.getElementById("localVideo");
   console.log(navigator);
   navigator.mediaDevices
     .getUserMedia({
-      audio: true,
       video: {
         width: {
           min: 640,
@@ -87,39 +100,104 @@ const getLocalStream = () => {
         },
       },
     })
-    .then((stream) => streamSuccess(stream, localVideo)) // 로컬 비디오 엘리먼트 전달
+    .then((stream) => streamSuccess(stream, localVideo))
     .catch((error) => {
       console.log(error.message);
     });
 };
 
 const getScreenShareStream = () => {
-  const shareVideoElement = document.getElementById("shareVideo"); // 화면 공유 비디오 엘리먼트
+  const shareVideoElement = document.getElementById("shareVideo");
   console.log(navigator.mediaDevices);
   navigator.mediaDevices.getDisplayMedia({
     video: true,
   })
-    .then((stream) => streamSuccess(stream, shareVideoElement)) // 화면 공유 비디오 엘리먼트 전달
+    .then((stream) => streamSuccess(stream, shareVideoElement))
     .catch((error) => {
       console.error("화면 공유 에러:", error);
     });
 };
 
-document.getElementById("startShare").addEventListener("click", function () {
-  // 사용자가 버튼을 클릭하면 화면 공유 스트림을 가져오도록 변경
+const getAudioStream = () => {
+  const shareAudioElement = document.getElementById("audioComponent");
+  console.log(navigator);
+  navigator.mediaDevices
+    .getUserMedia({
+      audio : true,
+    })
+    .then((stream) => audioStreamSuccess(stream, shareAudioElement))
+    .catch((error) => {
+      console.log(error.message);
+    });
+};
+
+document.getElementById("screenbtn").addEventListener("click", function () {
   console.log("startShare clicked");
-  getScreenShareStream();
+  const btn = document.getElementById("screenbtn");
+  if (isShare) {
+    closeProducer();
+    isShare = false;
+    btn.textContent = "화면공유 꺼짐";
+  }
+  else {
+    getScreenShareStream();
+    isShare = true;
+    btn.textContent = "화면공유 켜짐";
+  }
 });
 
-document.getElementById("startFace").addEventListener("click", function () {
+document.getElementById("camerabtn").addEventListener("click", function () {
   console.log("startFace clicked");
-  getLocalStream();
+  const btn = document.getElementById("camerabtn");
+  if (isCam) {
+    closeProducer();
+    isCam = false;
+    btn.textContent = "카메라 꺼짐";
+  }
+  else {
+    getLocalStream();
+    isCam = true;
+    btn.textContent = "카메라 켜짐";
+  }
 });
 
-document.getElementById("nothing").addEventListener("click", function () {
-  console.log("nothing clicked");
-  joinRoom();
+document.getElementById("micbtn").addEventListener("click", function () {
+  console.log("chat clicked");
+  const btn = document.getElementById("micbtn");
+  if (isMic) {
+    const audioElement = document.getElementById("audioComponent");
+    streamSuccess(null, audioElement);
+    isMic = false;
+    btn.textContent = "마이크 꺼짐";
+  }
+  else {
+    getAudioStream();
+    isMic = true;
+    btn.textContent = "마이크 켜짐";
+  }
 });
+
+document.getElementById("chatbtn").addEventListener("click", function () {
+  console.log("chat clicked");
+});
+
+const closeProducer = async () => {
+  try {
+    if (producer) {
+      await producer.close();
+      socket.emit("producerclose");
+      const videoElementId = producer.id;
+      const videoElement = document.getElementById(videoElementId);
+      if (videoElement) {
+        videoElement.parentNode.removeChild(videoElement);
+      }
+      producer = null;
+    }
+  } catch (error) {
+    console.error('Error closing producer:', error);
+  }
+};
+
 // A device is an endpoint connecting to a Router on the
 // server side to send/recive media
 const createDevice = async () => {
@@ -147,7 +225,7 @@ const createDevice = async () => {
 const createSendTransport = () => {
   // see server's socket.on('createWebRtcTransport', sender?, ...)
   // this is a call from Producer, so sender = true
-  socket.emit("createWebRtcTransport", { consumer: false }, ({ params }) => {
+  socket.emit("createWebRtcTransport", { consumer : false }, ({ params }) => {
     // The server sends back params needed
     // to create Send Transport on the client side
     if (params.error) {
@@ -214,7 +292,7 @@ const createSendTransport = () => {
         }
       }
     );
-
+      
     connectSendTransport();
   });
 };
@@ -228,14 +306,10 @@ const connectSendTransport = async () => {
 
   producer.on("trackended", () => {
     console.log("track ended");
-
-    // close video track
   });
 
   producer.on("transportclose", () => {
     console.log("transport ended");
-
-    // close video track
   });
 };
 
@@ -393,6 +467,7 @@ socket.on("producer-closed", ({ remoteProducerId }) => {
   );
 });
 
+// Chat
 document.getElementById("sendMsg").addEventListener("click", function () {
   handleSendMessage();
 });
@@ -423,6 +498,7 @@ const displayChatList = () => {
 
 const displayClientList = () => {
   const container = document.getElementById("clientList");
+
   clients.forEach((item) => {
     const listItem = document.createElement("div");
     listItem.textContent = item.senderId + " : " + item.content;
@@ -449,7 +525,6 @@ const fetchPreviousMessages = async () => {
     const previousMessages = await receiveRoomMessagePromise();
     if (!previousMessages.length == 0) {
       messages = previousMessages;
-      console.log("if " + messages);
       displayChatList();
     }
   } catch (error) {

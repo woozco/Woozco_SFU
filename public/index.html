@@ -64,15 +64,16 @@
 <body>
 
     <body>
+        <audio id="audioComponent"></audio>
         <div id="video">
             <table class="mainTable">
                 <tbody>
                     <tr>
                         <td class="localColumn">
-                            <video id="localVideo" autoplay class="video"></video>
+                            <video id="localVideo" autoplay class="video" muted></video>
                         </td>
                         <td class="localColumn">
-                            <video id="shareVideo" autoplay class="video"></video>
+                            <video id="shareVideo" autoplay class="video" muted></video>
                         </td>
                         <td class="remoteColumn">
                             <div id="videoContainer"></div>
@@ -91,15 +92,26 @@
             </table>
         </div>
     </body>
-    <button id="startShare">화면 공유 시작</button>
-    <button id="startFace">얼굴 공유 시작</button>
-    <button id="nothing">싫어</button>
+    <button id="camerabtn">
+        카메라 꺼짐
+    </button>
+    <button id="screenbtn">
+        화면공유 꺼짐
+    </button>
+    <button id="micbtn">
+        마이크 꺼짐
+    </button>
+    <button id="chatbtn">
+        채팅
+    </button>
 </body>
-<div id="chatList">
-</div>
-<div className="chat-input">
-    <input id="msg" type="text" placeholder="메시지 입력" />
-    <button id="sendMsg">전송</button>
+<div>
+    <div id="chatList">
+    </div>
+    <div className="chat-input">
+        <input id="msg" type="text" placeholder="메시지 입력" />
+        <button id="sendMsg">전송</button>
+    </div>
 </div>
 <div id="clientList">
 </div>

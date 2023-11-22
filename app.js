@@ -14,6 +14,7 @@ const __dirname = path.resolve();
 
 import { Server } from "socket.io";
 import mediasoup from "mediasoup";
+import e from "express";
 
 app.get("*", (req, res, next) => {
     const path = "/sfu/";
@@ -186,26 +187,6 @@ connections.on("connection", async (socket) => {
         return router1;
     };
 
-    // socket.on('createRoom', async (callback) => {
-    //   if (router === undefined) {
-    //     // worker.createRouter(options)
-    //     // options = { mediaCodecs, appData }
-    //     // mediaCodecs -> defined above
-    //     // appData -> custom application data - we are not supplying any
-    //     // none of the two are required
-    //     router = await worker.createRouter({ mediaCodecs, })
-    //     console.log(`Router ID: ${router.id}`)
-    //   }
-
-    //   getRtpCapabilities(callback)
-    // })
-
-    // const getRtpCapabilities = (callback) => {
-    //   const rtpCapabilities = router.rtpCapabilities
-
-    //   callback({ rtpCapabilities })
-    // }
-
     // Client emits a request to create server side Transport
     // We need to differentiate between the producer and consumer transports
     socket.on("createWebRtcTransport", async ({ consumer }, callback) => {
@@ -306,6 +287,7 @@ connections.on("connection", async (socket) => {
             (transport) =>
                 transport.socketId === socketId && !transport.consumer
         );
+        console.log(producerTransport);
         return producerTransport.transport;
     };
 
@@ -454,8 +436,8 @@ const createWebRtcTransport = async (router) => {
             const webRtcTransport_options = {
               listenIps: [
                 {
-                  ip: '', // private ip
-                  announcedIp: '', // public ip
+                  ip: '172.31.8.155', // private ip
+                  announcedIp: '3.35.250.216', // public ip
                 }
               ],
               enableUdp: true,
